@@ -1,4 +1,6 @@
 use clap::{Parser, Subcommand};
+use rdev::Event;
+use serde::{Deserialize, Serialize};
 use tokio::io;
 mod client;
 mod server;
@@ -13,7 +15,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum Mode {
     Server,
-    Client,
+    Client {
+        #[arg(short, long)]
+        addr: String,
+    },
 }
 
 #[tokio::main]
@@ -22,6 +27,17 @@ async fn main() -> io::Result<()> {
 
     match &cli.mode {
         Mode::Server => server::server().await,
-        Mode::Client => client::listen().await,
+        Mode::Client { addr } => client::listen(addr.clone()).await,
     }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+enum Packet {
+    Message(String),
+    Command(Event),
+}
+
+#[derive(Serialize, Deserialize)]
+enum Message {
+    Ready,
 }

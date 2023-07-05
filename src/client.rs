@@ -1,28 +1,53 @@
+use std::sync::Arc;
 
-use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
+use futures::prelude::*;
+use serde_json::{json, Value};
 use tokio::net::TcpStream;
-pub async fn listen() -> io::Result<()> {
+use tokio::{io, sync::Mutex};
+use tokio_serde::formats::SymmetricalJson;
+use tokio_serde::SymmetricallyFramed;
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
- let socket = TcpStream::connect("127.0.0.1:6142").await?;
-    let (mut rd, mut wr) = io::split(socket);
+use crate::Packet;
 
-    tokio::spawn(async move {
-        wr.write_all(b"hello\r\n").await?;
-        wr.write_all(b"world\r\n").await?;
+pub async fn listen(host: String) -> io::Result<()> {
+    let socket = TcpStream::connect(host).await?;
+    let (rd, wr) = io::split(socket);
 
-        Ok::<(), io::Error>(())
-    });
+    let length_delimited_write = FramedWrite::new(wr, LengthDelimitedCodec::new());
+    // let serialized = Arc::new(Mutex::new(SymmetricallyFramed::new(
+    //     length_delimited_write,
+    //     SymmetricalJson::<Packet>::default(),
+    // )));
 
-    let mut buf = vec![0; 128];
+    // let serialized_clone = serialized.clone();
 
-    loop {
-        let n = rd.read(&mut buf).await?;
+    // tokio::spawn(async move {
+    //     if let Ok(event) = rdev::listen(move |event| {
+    //         let serialized_clone = serialized_clone.clone();
+    //         tokio::spawn(async move {
+    //             let serialized_clone = serialized_clone.clone();
+    //             let mut s = serialized_clone.lock().await;
+    //             s.send(Packet::Command(event)).await?;
+    //
+    //             Ok::<(), io::Error>(())
+    //         });
+    //     }) {
+    //         println!("GOT {:?}", event);
+    //     };
+    //     Ok::<(), io::Error>(())
+    // });
 
-        if n == 0 {
-            break;
+    let length_delimited_read = FramedRead::new(rd, LengthDelimitedCodec::new());
+
+    let mut deserialized =
+        SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<Packet>::default());
+
+    while let Some(value) = deserialized.try_next().await? {
+        println!("GOT {:?}", value);
+        if let Packet::Command(event) = value {
+            rdev::simulate(&event.event_type);
         }
-
-        println!("GOT {:?}", &buf[..n]);
     }
 
     Ok(())
