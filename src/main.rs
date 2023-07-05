@@ -1,46 +1,27 @@
-use std::{thread, time};
+use clap::{Parser, Subcommand};
+use tokio::io;
+mod client;
+mod server;
 
-use rdev::{grab, listen, simulate, Button, Event, EventType, Key};
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    mode: Mode,
+}
 
-fn main() {
-    println!("Hello, worl");
-    let callback = |event: Event| -> Option<Event> {
-        if let EventType::MouseMove { x, y } = event.event_type {
-            println!("Consuming and cancelling CapsLock");
-            None // CapsLock is now effectively disabled
-        } else {
-            Some(event)
-        }
-    };
-    // send(&EventType::KeyPress(Key::KeyS));
-    // send(&EventType::KeyRelease(Key::KeyS));
-    //
-    // send(&EventType::MouseMove { x: 0.0, y: 0.0 });
-    // send(&EventType::MouseMove { x: 400.0, y: 400.0 });
-    // send(&EventType::ButtonPress(Button::Left));
-    // send(&EventType::ButtonRelease(Button::Right));
-    // send(&EventType::Wheel {
-    //     delta_x: 0,
-    //     delta_y: 1,
-    // });
+#[derive(Subcommand)]
+enum Mode {
+    Server,
+    Client,
+}
 
-    if let Err(error) = grab(callback) {
-        println!("Error: {:?}", error);
+#[tokio::main]
+async fn main() -> io::Result<()> {
+    let cli = Cli::parse();
+
+    match &cli.mode {
+        Mode::Server => server::server().await,
+        Mode::Client => client::listen().await,
     }
 }
-
-fn callback(event: Event) {
-    println!("My callback {:?}", event.event_type);
-}
-// //
-// // fn send(event_type: &EventType) {
-// //     let delay = time::Duration::from_millis(20);
-// //     match simulate(event_type) {
-//         Ok(()) => (),
-//         Err(SimulateError) => {
-//             println!("We could not send {:?}", event_type);
-//         }
-//     }
-//     // Let ths OS catchup (at least MacOS)
-//     thread::sleep(delay);
-// }
