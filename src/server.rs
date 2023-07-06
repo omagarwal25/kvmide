@@ -1,24 +1,24 @@
 use std::sync::Arc;
 
 use futures::prelude::*;
-use serde_json::{json, Value};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::{io, sync::Mutex};
+use tokio::io;
+use tokio::net::TcpListener;
+use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
-use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
 use crate::Packet;
 
 pub async fn server() -> io::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:6142").await?;
+    let listener = TcpListener::bind("192.168.195.101:6142").await?;
 
-    let (mut socket, _) = listener.accept().await?;
+    let (socket, _) = listener.accept().await?;
 
-    let (mut rd, wr) = io::split(socket);
+    let (_, wr) = io::split(socket);
 
     let length_delimited_write = FramedWrite::new(wr, LengthDelimitedCodec::new());
-    let serialized = Arc::new(Mutex::new(SymmetricallyFramed::new(
+    let mut serialized = Arc::new(Mutex::new(SymmetricallyFramed::new(
         length_delimited_write,
         SymmetricalJson::<Packet>::default(),
     )));
@@ -35,7 +35,7 @@ pub async fn server() -> io::Result<()> {
     //                     // handle and return.
     //                     Ok(0) => return,
     //                     Ok(n) => {
-    //                         // Copy the data back to socket
+    //                         // Copy s is me typing from both laptops at once?the data back to socket
     //                     }
     //                     Err(_) => {
     //                         // Unexpected socket error. There isn't much we can do
@@ -48,24 +48,16 @@ pub async fn server() -> io::Result<()> {
     //     }
     // });
 
-    let serialized_clone = serialized.clone();
-
-    tokio::spawn(async move {
-        if let Ok(event) = rdev::listen(move |event| {
-            let serialized_clone = serialized_clone.clone();
-            tokio::spawn(async move {
-                let serialized_clone = serialized_clone.clone();
-                let mut s = serialized_clone.lock().await;
-                s.send(Packet::Command(event)).await?;
-
-                Ok::<(), io::Error>(())
-            });
-        }) {
-            println!("GOT {:?}", event);
-        };
-        Ok::<(), io::Error>(())
-    });
+    if let Ok(event) = rdev::listen(move |event| {
+        // println!("d");
+        let serialized = serialized.clone();
+        tokio::spawn(async move {
+            let mut serialized = serialized.lock().await;
+            serialized.send(Packet::Command(event)).await.unwrap();
+        });
+    }) {
+        println!("GOT {:?}", event);
+    };
 
     Ok(())
 }
-
