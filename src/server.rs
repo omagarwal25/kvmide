@@ -79,7 +79,8 @@ impl Server {
         )));
 
         rdev::grab(move |event| {
-            let mut server_mouse = self.last_server_mouse.clone().lock();
+            let server_mouse_clone = self.last_server_mouse.clone();
+            let mut server_mouse = server_mouse_clone.lock();
 
             let mut server_mouse = match server_mouse {
                 Ok(server_mouse) => server_mouse,
@@ -87,7 +88,8 @@ impl Server {
             };
 
             if let EventType::MouseMove { x, y } = event.event_type {
-                let mut client_mouse = self.client_mouse.clone().lock();
+                let client_mouse_clone = self.client_mouse.clone();
+                let mut client_mouse = client_mouse_clone.lock();
                 let mut client_mouse = match client_mouse {
                     Ok(client_mouse) => client_mouse,
                     Err(_) => return Some(event),
