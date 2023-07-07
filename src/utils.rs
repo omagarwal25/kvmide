@@ -1,11 +1,11 @@
-use rdev::{Event, GrabError};
+use rdev::{Event, EventType, GrabError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Packet {
     Message(String),
-    Command(Event),
+    Command(EventType),
 }
 
 #[derive(Serialize, Deserialize)]

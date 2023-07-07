@@ -43,7 +43,7 @@ pub async fn listen(host: String) -> Result<()> {
     while let Some(value) = deserialized.try_next().await? {
         println!("GOT {:?}", value);
         if let Packet::Command(event) = value {
-            rdev::simulate(&event.event_type);
+            rdev::simulate(&event);
         }
     }
 

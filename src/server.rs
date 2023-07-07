@@ -11,8 +11,7 @@ use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
-use crate::utils::RdevError;
-use crate::Packet;
+use crate::utils::{Packet, RdevError};
 
 pub async fn server() -> Result<()> {
     let server = Server::new().await?;
@@ -47,7 +46,9 @@ pub async fn server() -> Result<()> {
 }
 
 struct Server {
-    last_mouse: (f64, f64),
+    last_server_mouse: Arc<std::sync::Mutex<(f64, f64)>>,
+    // TODO: migrate this to a hashmap of screens or something along those lines?
+    client_mouse: Arc<std::sync::Mutex<(f64, f64)>>,
     socket: TcpStream,
 }
 
@@ -62,12 +63,13 @@ impl Server {
         let (socket, _) = listener.accept().await?;
 
         Ok(Self {
-            last_mouse: (0.0, 0.0),
+            last_server_mouse: Arc::new(std::sync::Mutex::new((0.0, 0.0))),
+            client_mouse: Arc::new(std::sync::Mutex::new((0.0, 0.0))),
             socket,
         })
     }
 
-    async fn capture(self) -> Result<()> {
+    async fn capture(mut self) -> Result<()> {
         let (_, wr) = io::split(self.socket);
 
         let length_delimited_write = FramedWrite::new(wr, LengthDelimitedCodec::new());
@@ -77,28 +79,67 @@ impl Server {
         )));
 
         rdev::grab(move |event| {
-            let away = false;
+            let mut server_mouse = self.last_server_mouse.clone().lock();
+
+            let mut server_mouse = match server_mouse {
+                Ok(server_mouse) => server_mouse,
+                Err(_) => return Some(event),
+            };
 
             if let EventType::MouseMove { x, y } = event.event_type {
-                // check if the mouse has moved to the left and the last mouse was within 0.5 of 0
+                let mut client_mouse = self.client_mouse.clone().lock();
+                let mut client_mouse = match client_mouse {
+                    Ok(client_mouse) => client_mouse,
+                    Err(_) => return Some(event),
+                };
 
-                if (x - 0.0).abs() < 0.5 && (x - self.last_mouse.0).abs() > 0.0 {
+                let dx = x - server_mouse.0;
+                let dy = y - server_mouse.1;
+
+                if (x - 0.0).abs() < 0.5 && dx > 0.0 && (client_mouse.0 - 1440.0).abs() > 0.5 {
+                    *server_mouse = (x, y);
                     return Some(event);
                 }
 
-                self.last_mouse = (x, y);
+                if (x - 0.0).abs() > 0.5 {
+                    *server_mouse = (x, y);
+                    return Some(event);
+                }
+
+                if (x - 0.0).abs() < 0.5 && dx < 0.0 {
+                    *client_mouse = (0.0, y);
+                }
+
+                // basically what we need to do is calculate the dx and dy of the mouse to the last
+                // mouse position and send that to the other computer
+
+                let event = EventType::MouseMove {
+                    x: client_mouse.0 + dx,
+                    y: client_mouse.1 + dy,
+                };
+
+                *client_mouse = (client_mouse.0 + dx, client_mouse.1 + dy);
+
+                let serialized = serialized.clone();
+
+                tokio::spawn(async move {
+                    let mut serialized = serialized.lock().await;
+                    serialized.send(Packet::Command(event)).await;
+                });
+
+                return None;
             }
 
-            if (self.last_mouse.0 - 0.0).abs() > 0.5 {
+            if (server_mouse.0 - 0.0).abs() > 0.5 {
                 return Some(event);
             }
 
             // if the mouse is moving right away from 0, send the event
-
             let serialized = serialized.clone();
+
             tokio::spawn(async move {
                 let mut serialized = serialized.lock().await;
-                serialized.send(Packet::Command(event)).await;
+                serialized.send(Packet::Command(event.event_type)).await;
             });
 
             None
