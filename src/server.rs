@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use futures::prelude::*;
-use tokio::io;
+use rdev::EventType;
+use tokio::{io, net::TcpStream};
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
@@ -66,4 +67,17 @@ pub async fn server() -> io::Result<()> {
     };
 
     Ok(())
+}
+
+
+
+struct Server {
+    last_mouse: (f64, f64),
+    socket : TcpStream,
+}
+
+impl Server {
+    fn new() -> Self {
+        
+    }
 }
