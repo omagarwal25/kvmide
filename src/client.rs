@@ -1,16 +1,13 @@
-use std::sync::Arc;
-
+use anyhow::Result;
 use futures::prelude::*;
-use serde_json::{json, Value};
+use tokio::io;
 use tokio::net::TcpStream;
-use tokio::{io, sync::Mutex};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-use crate::Packet;
-
-pub async fn listen(host: String) -> io::Result<()> {
+use crate::utils::Packet;
+pub async fn listen(host: String) -> Result<()> {
     let socket = TcpStream::connect(host).await?;
     let (rd, wr) = io::split(socket);
 
