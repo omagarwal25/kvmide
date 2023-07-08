@@ -1,4 +1,4 @@
-use rdev::{Event, EventType, GrabError};
+use rdev::{EventType, GrabError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
