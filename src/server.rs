@@ -46,7 +46,7 @@ impl Server {
 
         Ok(Self {
             last_server_mouse: Arc::new(std::sync::Mutex::new((0.0, 0.0))),
-            client_mouse: Arc::new(std::sync::Mutex::new((1440.0, 0.0))),
+            client_mouse: Arc::new(std::sync::Mutex::new((2560.0, 0.0))),
             socket,
             screen: Arc::new(std::sync::Mutex::new(Screen::Server)),
         })
@@ -93,7 +93,7 @@ impl Server {
                     match screen.to_owned() {
                         Screen::Server if (x - 0.0).abs() <= 0.5 && dx < 0.0 => {
                             *screen = Screen::Client;
-                            *client_mouse = (1440.0, y);
+                            *client_mouse = (2560.0, y);
                             *server_mouse = (x, y);
 
                             (
@@ -112,7 +112,7 @@ impl Server {
                             (None, Some(event))
                         }
 
-                        Screen::Client if (client_mouse.0 - 1440.0).abs() <= 0.5 && dx > 0.0 => {
+                        Screen::Client if (client_mouse.0 - 2560.0).abs() <= 0.5 && dx > 0.0 => {
                             // the mouse is on the client screen and is moving right
                             // switch to server screen
 
@@ -135,7 +135,7 @@ impl Server {
                         Screen::Client => {
                             // the mouse is on the client screen
 
-                            *client_mouse = (client_mouse.0 + dx, client_mouse.1 + dy);
+                            *client_mouse = ((client_mouse.0 + dx).clamp(0.0, 2560.0), (client_mouse.1 + dy).clamp(0.0, 1600.0));
 
                             (
                                 Some(EventType::MouseMove {
